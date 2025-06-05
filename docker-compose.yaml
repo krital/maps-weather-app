@@ -1,8 +1,6 @@
-version: '3.9'
-
 services:
   maps:
-    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
+    image: gmapsmessaging/server_daemon_arm_3.3.7-snapshot
     container_name: maps
     ports:
       - "8080:8080"
@@ -10,36 +8,31 @@ services:
       - "1883:1883"
     environment:
       - MAPS_AUTH_TOKEN=supersecrettoken
-    volumes:
-      - ./config:/app/config
     restart: unless-stopped
 
   weather-worker:
-    env_file:
-      - .env
     build:
       context: ./weather-worker
     container_name: weather-worker
     depends_on:
       - maps
     environment:
-      - MAPS_URL=http://maps:8080
+      - MAPS_URL=http://localhost:8080
       - MAPS_TOKEN=supersecrettoken
-      - OPENWEATHERMAP_API_KEY=your_openweathermap_key
+      - OPENWEATHERMAP_API_KEY=your_openweathermap_api_key_here
     volumes:
       - ./weather-worker:/app
     restart: unless-stopped
 
   mqtt-rest-bridge:
-    env_file:
-      - .env
     build:
       context: ./mqtt-bridge
     container_name: mqtt-bridge
     depends_on:
       - maps
     environment:
-      - WEBHOOK_URL=http://your-agent-endpoint/webhook
+      - MAPS_TOKEN=supersecrettoken
+      - WEBHOOK_URL=http://webhook-mock:5001/webhook
     restart: unless-stopped
 
   webhook-mock:
