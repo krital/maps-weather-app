@@ -1,4 +1,4 @@
-
+import os
 import requests
 import json
 from datetime import datetime
@@ -10,10 +10,17 @@ incoming_message = {
 }
 
 def fetch_weather(city, unit):
-    api_key = "<your-openweathermap-api-key>"
+    api_key = os.getenv("OPENWEATHERMAP_API_KEY")
+    if not api_key:
+        raise EnvironmentError("OPENWEATHERMAP_API_KEY not found in environment")
     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&units={unit}&appid={api_key}"
     response = requests.get(url)
     data = response.json()
+    print("⚠️ Raw OpenWeather response:", json.dumps(data, indent=2))
+
+    if "main" not in data:
+        raise ValueError(f"OpenWeather response error: {data}")
+
     return {
         "location": {"city": city},
         "temperature": data["main"]["temp"],
@@ -29,12 +36,11 @@ publish_payload = {
     "message": weather_data
 }
 
-# Replace this URL with your actual MAPS instance endpoint
-maps_url = "https://your.maps.instance/v1/messages/publish"
+maps_url = "http://maps:8080/v1/messages/publish"
 headers = {
-    "Authorization": "Bearer <your-token>",
+    "Authorization": f"Bearer {os.getenv('MAPS_TOKEN', 'supersecrettoken')}",
     "Content-Type": "application/json"
 }
 
 response = requests.post(maps_url, headers=headers, data=json.dumps(publish_payload))
-print(response.status_code, response.text)
+print("📬 Published to MAPS:", response.status_code, response.text)
