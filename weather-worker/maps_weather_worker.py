@@ -36,11 +36,15 @@ publish_payload = {
     "message": weather_data
 }
 
-maps_url = "http://maps:8080/v1/messages/publish"
+maps_host = os.getenv("MAPS_URL", "http://localhost:8080")
+maps_url = f"{maps_host}/v1/messages/publish"
 headers = {
     "Authorization": f"Bearer {os.getenv('MAPS_TOKEN', 'supersecrettoken')}",
     "Content-Type": "application/json"
 }
 
-response = requests.post(maps_url, headers=headers, data=json.dumps(publish_payload))
-print("📬 Published to MAPS:", response.status_code, response.text)
+try:
+    response = requests.post(maps_url, headers=headers, data=json.dumps(publish_payload))
+    print("📬 Published to MAPS:", response.status_code, response.text)
+except requests.exceptions.RequestException as e:
+    print("❌ Failed to publish to MAPS:", str(e))
