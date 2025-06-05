@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   maps:
-    image: ghcr.io/mapsmessaging/maps:latest
+    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
     container_name: maps
     ports:
       - "8080:8080"
