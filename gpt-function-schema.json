@@ -1,0 +1,24 @@
+{
+  "name": "getWeather",
+  "description": "Get current weather for a specific city.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "city": {
+        "type": "string",
+        "description": "City name, e.g., London"
+      },
+      "unit": {
+        "type": "string",
+        "enum": [
+          "metric",
+          "imperial"
+        ],
+        "description": "Unit system for temperature"
+      }
+    },
+    "required": [
+      "city"
+    ]
+  }
+}

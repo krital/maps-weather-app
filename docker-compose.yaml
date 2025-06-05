@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+  maps:
+    image: ghcr.io/mapsmessaging/maps:latest
+    container_name: maps
+    ports:
+      - "8080:8080"
+      - "4222:4222"
+      - "1883:1883"
+    environment:
+      - MAPS_AUTH_TOKEN=supersecrettoken
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+
+  weather-worker:
+    build:
+      context: ./weather-worker
+    container_name: weather-worker
+    depends_on:
+      - maps
+    environment:
+      - MAPS_URL=http://maps:8080
+      - MAPS_TOKEN=supersecrettoken
+      - OPENWEATHERMAP_API_KEY=your_openweathermap_key
+    volumes:
+      - ./weather-worker:/app
+    restart: unless-stopped
+
+  mqtt-rest-bridge:
+    build:
+      context: ./mqtt-bridge
+    container_name: mqtt-bridge
+    depends_on:
+      - maps
+    environment:
+      - WEBHOOK_URL=http://your-agent-endpoint/webhook
+    restart: unless-stopped
+
+  webhook-mock:
+    build:
+      context: ./webhook-mock
+    container_name: webhook-mock
+    ports:
+      - "5001:5001"
+    restart: unless-stopped

@@ -1,0 +1,7 @@
+version: '3.9'
+
+services:
+  weather-worker:
+    volumes:
+      - ./weather-worker:/app
+    command: ["watchmedo", "auto-restart", "--pattern=*.py", "--recursive", "--", "python", "maps_weather_worker.py"]
