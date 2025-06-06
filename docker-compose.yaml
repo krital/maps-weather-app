@@ -15,7 +15,7 @@ services:
       - app-network
 
   maps:
-    image: maps:latest
+    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
     ports:
       - "8080:8080"
       - "1883:1883"
