@@ -1,92 +1,73 @@
+version: "3.8"
+
 services:
-  maps:
-    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
-    depends_on:
-      consul:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-    ports:
-      - "8080:8080"
-    environment:
-      MAPS_LICENSE_KEY: ${MAPS_LICENSE_KEY}
-
-  weather-worker:
-    build:
-      context: ./weather-worker
-    container_name: weather-worker
-    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
-    depends_on:
-      maps:
-        condition: service_started
-      consul:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-    ports:
-      - "8080:8080"
-    environment:
-      MAPS_LICENSE_KEY: ${MAPS_LICENSE_KEY}
-      OPENWEATHERMAP_API_KEY: ${OPENWEATHERMAP_API_KEY}
-
-  mqtt-broker:
-    image: eclipse-mosquitto
-    container_name: mqtt-broker
-    ports:
-      - "1883:1883"
-
-  mqtt-rest-bridge:
-    build:
-      context: ./mqtt-bridge
-    container_name: mqtt-bridge
-    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
-    depends_on:
-      maps:
-        condition: service_started
-      consul:
-        condition: service_healthy
-      mqtt-broker:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-    ports:
-      - "8080:8080"
-    environment:
-      MAPS_LICENSE_KEY: ${MAPS_LICENSE_KEY}
-      MQTT_BROKER: mqtt-broker
-      MQTT_PORT: 1883
-
-  webhook-mock:
-    build:
-      context: ./webhook-mock
-    container_name: webhook-mock
-    ports:
-      - "5001:5001"
-    restart: unless-stopped
-
   consul:
-    image: hashicorp/consul:latest
-    container_name: consul
+    image: consul:1.15
     ports:
       - "8500:8500"
-      - "8600:8600/udp"
-    command: "agent -dev -client=0.0.0.0"
-    restart: unless-stopped
+    command: agent -dev -client=0.0.0.0
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8500/v1/status/leader"]
+      test: ["CMD", "consul", "members"]
       interval: 5s
       timeout: 3s
-      retries: 10
-      start_period: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  maps:
+    image: maps:latest
+    ports:
+      - "8080:8080"
+      - "1883:1883"
+    environment:
+      - MAPS_HOME=/maps-3.3.7-SNAPSHOT
+      - MAPS_DATA=/maps/data
+      - ConsulHost=consul
+      - ConsulPort=8500
+      - ForceConsul=true
+    volumes:
+      - maps-data:/maps/data
+    depends_on:
+      consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+  weather-worker:
+    build: ./weather-worker
+    environment:
+      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY}
+      - MAPS_URL=http://maps:8080/v1/messages/publish
+    depends_on:
+      maps:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  mqtt-bridge:
+    build: ./mqtt-bridge
+    depends_on:
+      maps:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  webhook-mock:
+    build: ./webhook-mock
+    ports:
+      - "9999:9999"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  maps-data:
+    driver: local

@@ -1,50 +1,65 @@
+# Placeholder for maps_weather_worker.py
+
 import os
-import requests
 import json
-from datetime import datetime
+import requests
+from dotenv import load_dotenv
 
-# Simulated message received from MAPS Messaging
-incoming_message = {
-    "location": { "city": "London" },
-    "preferences": { "unit": "metric" }
-}
+load_dotenv()
 
-def fetch_weather(city, unit):
-    api_key = os.getenv("OPENWEATHERMAP_API_KEY")
-    if not api_key:
-        raise EnvironmentError("OPENWEATHERMAP_API_KEY not found in environment")
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&units={unit}&appid={api_key}"
-    response = requests.get(url)
-    data = response.json()
-    print("⚠️ Raw OpenWeather response:", json.dumps(data, indent=2))
+MAPS_URL = os.getenv('MAPS_URL', 'http://maps:8080/v1/messages/publish')
+OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
+MAPS_TOKEN = os.getenv('MAPS_TOKEN', 'supersecrettoken')
 
-    if "main" not in data:
-        raise ValueError(f"OpenWeather response error: {data}")
-
-    return {
-        "location": {"city": city},
-        "temperature": data["main"]["temp"],
-        "conditions": data["weather"][0]["main"],
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+def get_weather(city, unit='metric'):
+    """Get weather data from OpenWeatherMap API."""
+    url = f"http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city,
+        'appid': OPENWEATHERMAP_API_KEY,
+        'units': unit
     }
+    response = requests.get(url, params=params)
+    return response.json()
 
-weather_data = fetch_weather(incoming_message["location"]["city"],
-                              incoming_message["preferences"]["unit"])
+def publish_to_maps(topic, message):
+    """Publish message to MAPS."""
+    headers = {
+        'Authorization': f'Bearer {MAPS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'topic': topic,
+        'message': message
+    }
+    response = requests.post(MAPS_URL, headers=headers, json=data)
+    return response.json()
 
-publish_payload = {
-    "topic": "weather.responses",
-    "message": weather_data
-}
+def main():
+    print("Weather worker started...")
+    while True:
+        try:
+            # Subscribe to weather requests
+            response = requests.get(
+                f"{MAPS_URL}/subscribe",
+                headers={'Authorization': f'Bearer {MAPS_TOKEN}'},
+                params={'topic': 'weather.requests'}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('message'):
+                    location = data['message'].get('location', {}).get('city')
+                    preferences = data['message'].get('preferences', {})
+                    unit = preferences.get('unit', 'metric')
+                    
+                    if location:
+                        weather_data = get_weather(location, unit)
+                        publish_to_maps('weather.responses', weather_data)
+                        
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
 
-maps_host = os.getenv("MAPS_URL", "http://localhost:8080")
-maps_url = f"{maps_host}/v1/messages/publish"
-headers = {
-    "Authorization": f"Bearer {os.getenv('MAPS_TOKEN', 'supersecrettoken')}",
-    "Content-Type": "application/json"
-}
-
-try:
-    response = requests.post(maps_url, headers=headers, data=json.dumps(publish_payload))
-    print("📬 Published to MAPS:", response.status_code, response.text)
-except requests.exceptions.RequestException as e:
-    print("❌ Failed to publish to MAPS:", str(e))
+if __name__ == '__main__':
+    main()
