@@ -1,0 +1,8 @@
+server:
+  port: 8080
+  authToken: supersecrettoken
+
+consul:
+  enabled: true
+  host: consul
+  port: 8500

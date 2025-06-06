@@ -1,39 +1,72 @@
 services:
   maps:
     image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
-    container_name: maps
+    depends_on:
+      consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     ports:
       - "8080:8080"
-      - "4222:4222"
-      - "1883:1883"
     environment:
-      - MAPS_AUTH_TOKEN=supersecrettoken
-    restart: unless-stopped
+      MAPS_LICENSE_KEY: ${MAPS_LICENSE_KEY}
 
   weather-worker:
     build:
       context: ./weather-worker
     container_name: weather-worker
+    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
     depends_on:
-      - maps
+      maps:
+        condition: service_started
+      consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    ports:
+      - "8080:8080"
     environment:
-      - MAPS_URL=http://localhost:8080
-      - MAPS_TOKEN=supersecrettoken
-      - OPENWEATHERMAP_API_KEY=your_openweathermap_api_key_here
-    volumes:
-      - ./weather-worker:/app
-    restart: unless-stopped
+      MAPS_LICENSE_KEY: ${MAPS_LICENSE_KEY}
+      OPENWEATHERMAP_API_KEY: ${OPENWEATHERMAP_API_KEY}
+
+  mqtt-broker:
+    image: eclipse-mosquitto
+    container_name: mqtt-broker
+    ports:
+      - "1883:1883"
 
   mqtt-rest-bridge:
     build:
       context: ./mqtt-bridge
     container_name: mqtt-bridge
+    image: mapsmessaging/server_daemon_arm_3.3.7-snapshot
     depends_on:
-      - maps
+      maps:
+        condition: service_started
+      consul:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    ports:
+      - "8080:8080"
     environment:
-      - MAPS_TOKEN=supersecrettoken
-      - WEBHOOK_URL=http://webhook-mock:5001/webhook
-    restart: unless-stopped
+      MAPS_LICENSE_KEY: ${MAPS_LICENSE_KEY}
+      MQTT_BROKER: mqtt-broker
+      MQTT_PORT: 1883
 
   webhook-mock:
     build:
@@ -42,3 +75,18 @@ services:
     ports:
       - "5001:5001"
     restart: unless-stopped
+
+  consul:
+    image: hashicorp/consul:latest
+    container_name: consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    command: "agent -dev -client=0.0.0.0"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8500/v1/status/leader"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
