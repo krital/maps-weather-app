@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MAPS_URL = os.getenv('MAPS_URL', 'http://maps:8080/v1/messages/publish')
+MAPS_URL = os.getenv('MAPS_URL', 'http://[::1]:8080/v1/messages/publish')
 OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
 MAPS_TOKEN = os.getenv('MAPS_TOKEN', 'supersecrettoken')
 

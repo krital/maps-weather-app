@@ -19,6 +19,7 @@ services:
     ports:
       - "8080:8080"
       - "1883:1883"
+      - "5672:5672"
     environment:
       - MAPS_HOME=/maps-3.3.7-SNAPSHOT
       - MAPS_DATA=/maps/data
